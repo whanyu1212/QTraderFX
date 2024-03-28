@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "python-real-time-algo-trading-system"
+version = "0.1.0"
+description = "building a real time algo trading system in python"
+authors = ["Hy <107110503+whanyu1212@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+oandapyv20 = "^0.7.2"
+pandas = "^2.2.1"
+numpy = "^1.26.4"
+scikit-learn = "^1.4.1.post1"
+xgboost = "^2.0.3"
+pandas-ta = "^0.3.14b0"
+black = "^24.3.0"
+flake8 = "^7.0.0"
+isort = "^5.13.2"
+docformatter = "^1.7.5"
+pre-commit = "^3.7.0"
+pytest = "^8.1.1"
+streamlit = "^1.32.2"
+ipykernel = "^6.29.4"
+python-dotenv = "^1.0.1"
+plotly = "^5.20.0"
+shap = "^0.45.0"
+matplotlib = "^3.8.3"
+termcolor = "^2.4.0"
+tensorflow = "^2.16.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
