@@ -29,6 +29,8 @@ matplotlib = "^3.8.3"
 termcolor = "^2.4.0"
 tensorflow = "^2.16.1"
 seaborn = "^0.13.2"
+gym = "^0.26.2"
+gym-anytrading = "^2.0.0"
 
 
 [build-system]
