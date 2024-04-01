@@ -28,3 +28,9 @@
 - [x] High level code for ML based strategy with events
 
 </details>
+
+
+#### References:
+https://oanda-api-v20.readthedocs.io
+https://github.com/AminHP/gym-anytrading/tree/master
+https://stable-baselines.readthedocs.io/en/master/modules/a2c.html
