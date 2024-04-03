@@ -33,6 +33,7 @@ gym = "^0.26.2"
 gym-anytrading = "^2.0.0"
 quantstats = "^0.0.62"
 stable-baselines3 = "^2.2.1"
+colorama = "^0.4.6"
 
 
 [build-system]
