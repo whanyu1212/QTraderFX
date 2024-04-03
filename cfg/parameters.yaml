@@ -1,0 +1,11 @@
+candlestick:
+  instrument: 'USD_JPY'
+  granularity: 'M1'
+  count: 5000
+
+pricingstream:
+  instrument: 'USD_JPY'
+
+
+
+
