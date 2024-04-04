@@ -79,17 +79,3 @@ class StreamingDataPipeline:
             print("Streaming stopped by user.")
         finally:
             return self.df
-
-
-if __name__ == "__main__":
-    accountID = "101-003-28603661-001"
-    params = {"instruments": "EUR_USD"}  # replace with your parameters
-    token = "b0ac81fa4d3fb91f1baa33015ed82104-c86dead361eb448ef07204a90b8fe7d9"
-    api = API(access_token=token)  # Create an API object with your token
-    df = pd.DataFrame()  # replace with your DataFrame
-
-    # Create an instance of the StreamingDataPipeline class
-    pipeline = StreamingDataPipeline(accountID, params, api, df)
-
-    # Run the pipeline
-    df = pipeline.run()
