@@ -5,6 +5,14 @@ from oandapyV20 import API
 from datetime import datetime, timedelta
 from termcolor import colored
 from src.q_learning import QLearningTrader
+from src.orders import (
+    get_open_positions,
+    get_take_profit_price,
+    get_stop_loss_price,
+    place_market_order,
+    place_limit_order,
+    close_all_trades,
+)
 from src.utils import (
     process_streaming_response,
     get_candlestick_data,
@@ -19,7 +27,7 @@ class StreamingDataPipeline:
         self.api = api
         self.df = df
         self.start_time = datetime.now()
-        self.max_duration = timedelta(minutes=20)
+        self.max_duration = timedelta(minutes=10)
         self.interval_start = datetime.now()
         self.interval = timedelta(minutes=1)
         self.temp_list = []
@@ -47,8 +55,51 @@ class StreamingDataPipeline:
             self.interval_start = datetime.now()
             if self.temp_list:
                 new_df = get_candlestick_data(self.interval_start, self.temp_list)
-                self.qtrader.update(self.df, new_df)
-                print()
+                action = self.qtrader.update(self.df, new_df)
+                positions = get_open_positions(self.accountID, self.api)
+                if action == 0 and not positions:
+                    print(f"Stop loss price: {stoplossprice}")
+                    print(f"Take profit price: {takeprofitprice}")
+                    print("Placing market order...")
+                    place_market_order(
+                        self.api,
+                        self.accountID,
+                        self.params["instruments"],
+                        1000,
+                    )
+                    print()
+
+                if action == 1 and positions:
+                    print("Closing all open positions...")
+                    stoplossprice = get_stop_loss_price(
+                        self.api,
+                        self.accountID,
+                        self.params["instruments"],
+                        -1000,
+                        0.02,
+                    )
+                    takeprofitprice = get_take_profit_price(
+                        self.api,
+                        self.accountID,
+                        self.params["instruments"],
+                        -1000,
+                        0.02,
+                    )
+                    print(f"Stop loss price: {stoplossprice}")
+                    print(f"Take profit price: {takeprofitprice}")
+                    print("Selling market order...")
+                    place_limit_order(
+                        self.api,
+                        self.accountID,
+                        self.params["instruments"],
+                        -1000,
+                        takeprofitprice,
+                        stoplossprice,
+                    )
+                    print()
+                    # close_all_positions(self.api, self.accountID)
+                else:
+                    print("No action taken.")
                 self.df = pd.concat([self.df, new_df])
                 self.temp_list.clear()
                 self.df = calculate_indicators(self.df)
@@ -63,6 +114,7 @@ class StreamingDataPipeline:
             rv = self.api.request(r)
             for tick in rv:
                 if self.check_max_duration():
+                    close_all_trades(self.api, self.accountID)
                     break
                 try:
                     self.process_tick(tick)

@@ -53,20 +53,22 @@ def fetch_historical_candles(cfg):
 
 
 def start_streaming_pipeline(cfg, df):
-    api = API(access_token=token)
+    client = API(access_token=token)
     params = {"instruments": cfg["pricingstream"]["instrument"]}
-    pipeline = StreamingDataPipeline(accountID, params, api, df)
+    pipeline = StreamingDataPipeline(accountID, params, client, df)
     pipeline.run()
 
 
 def main():
     logger.info("Starting the pipeline...")
     cfg = get_config("./cfg/parameters.yaml")
+    # Get account summary before starting the pipeline
     get_account_summary()
-    time.sleep(5)
+    time.sleep(10)
     df = calculate_indicators(fetch_historical_candles(cfg))
     df.dropna(inplace=True)
     logger.success(f"Historical candlestick data fetched successfully:\n{df.tail()}")
+    # Where real time streaming data is processed
     start_streaming_pipeline(cfg, df)
     logger.info("Pipeline completed.")
 

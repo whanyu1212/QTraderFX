@@ -149,3 +149,5 @@ class QLearningTrader:
             + colored(", Cumulative reward: ", "green")
             + colored(f"{self.cumulative_reward}", "white")
         )
+
+        return action
