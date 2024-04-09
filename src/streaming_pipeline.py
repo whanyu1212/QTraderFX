@@ -1,18 +1,12 @@
 import pandas as pd
 import oandapyV20
 import oandapyV20.endpoints.pricing as pricing
-from oandapyV20 import API
 from datetime import datetime, timedelta
 from termcolor import colored
 from src.q_learning import QLearningTrader
-from src.orders import (
-    get_open_positions,
-    get_take_profit_price,
-    get_stop_loss_price,
-    place_market_order,
-    place_limit_order,
-    close_all_trades,
-)
+from src.trading_bot import TradingBot
+
+
 from src.utils import (
     process_streaming_response,
     get_candlestick_data,
@@ -21,22 +15,38 @@ from src.utils import (
 
 
 class StreamingDataPipeline:
-    def __init__(self, accountID, params, api, df):
+    def __init__(
+        self,
+        accountID,
+        params,
+        client,
+        df,
+        precision,
+        stop_loss_pips,
+        take_profit_pips,
+    ):
         self.accountID = accountID
         self.params = params
-        self.api = api
+        self.client = client
         self.df = df
         self.start_time = datetime.now()
-        self.max_duration = timedelta(minutes=10)
+        self.max_duration = timedelta(minutes=5)
         self.interval_start = datetime.now()
         self.interval = timedelta(minutes=1)
         self.temp_list = []
         self.qtrader = QLearningTrader(
             num_actions=3,
-            num_features=9,
+            num_features=11,
             learning_rate=0.01,
-            discount_factor=0.9,
+            discount_factor=0.8,
             exploration_prob=0.1,
+        )
+        self.bot = TradingBot(
+            client,
+            accountID,
+            precision,
+            stop_loss_pips,
+            take_profit_pips,
         )
 
     def check_max_duration(self):
@@ -46,75 +56,82 @@ class StreamingDataPipeline:
         return False
 
     def process_tick(self, tick):
+        print("Processing tick...")
         process_streaming_response(tick, self.temp_list)
         print(
             f"Time: {tick['time']}, {colored('closeoutBid:', 'green')} {tick['closeoutBid']}, {colored('closeoutAsk:', 'red')} {tick['closeoutAsk']}"
         )
         print()
         if datetime.now() - self.interval_start >= self.interval:
+            print("Interval reached...")
             self.interval_start = datetime.now()
             if self.temp_list:
+                print("Temp list is not empty...")
                 new_df = get_candlestick_data(self.interval_start, self.temp_list)
                 action = self.qtrader.update(self.df, new_df)
-                positions = get_open_positions(self.accountID, self.api)
+                positions = self.bot.get_open_positions()
+                print(f"Open positions: {positions}")
                 if action == 0 and not positions:
-                    print(f"Stop loss price: {stoplossprice}")
-                    print(f"Take profit price: {takeprofitprice}")
-                    print("Placing market order...")
-                    place_market_order(
-                        self.api,
-                        self.accountID,
-                        self.params["instruments"],
-                        1000,
-                    )
+                    print("Action is 0 and no open positions...")
+                    print("Placing market order to buy...")
+                    self.bot.place_market_order(self.params["instruments"], 100000)
                     print()
 
-                if action == 1 and positions:
-                    print("Closing all open positions...")
-                    stoplossprice = get_stop_loss_price(
-                        self.api,
-                        self.accountID,
-                        self.params["instruments"],
-                        -1000,
-                        0.02,
+                elif action == 1 and positions:
+                    print("Action is 1 and there are open positions...")
+                    print("Placing limit order to sell...")
+                    stoplossprice = self.bot.get_stop_loss_price(
+                        self.params["instruments"], -100000
                     )
-                    takeprofitprice = get_take_profit_price(
-                        self.api,
-                        self.accountID,
-                        self.params["instruments"],
-                        -1000,
-                        0.02,
+                    takeprofitprice = self.bot.get_take_profit_price(
+                        self.params["instruments"], -100000
                     )
-                    print(f"Stop loss price: {stoplossprice}")
-                    print(f"Take profit price: {takeprofitprice}")
-                    print("Selling market order...")
-                    place_limit_order(
-                        self.api,
-                        self.accountID,
+                    self.bot.place_limit_order(
                         self.params["instruments"],
-                        -1000,
-                        takeprofitprice,
+                        -100000,
                         stoplossprice,
+                        takeprofitprice,
                     )
                     print()
-                    # close_all_positions(self.api, self.accountID)
+                    # close_all_positions(self.client, self.accountID)
+                elif (
+                    abs(self.temp_list[-1] - self.df["resistance"].iloc[-1]) <= 0.0001
+                    and positions
+                ):
+                    print("Price at resistance level, closing position...")
+                    self.bot.place_limit_order(
+                        self.params["instruments"],
+                        -100000,
+                        stoplossprice,
+                        takeprofitprice,
+                    )
+                elif self.temp_list[-1] <= self.df["support"].iloc[-1] and positions:
+                    print("Price at support level, closing position...")
+                    self.bot.place_limit_order(
+                        self.params["instruments"],
+                        -100000,
+                        stoplossprice,
+                        takeprofitprice,
+                    )
                 else:
-                    print("No action taken.")
-                self.df = pd.concat([self.df, new_df])
+                    print("Holding position...")
+                self.df = pd.concat([self.df, new_df], ignore_index=True)
                 self.temp_list.clear()
                 self.df = calculate_indicators(self.df)
                 print(self.df.tail(5))
                 print()
+        else:
+            print("Interval not reached...")
 
     def run(self):
         self.qtrader.train(self.df)
         print()
         r = pricing.PricingStream(accountID=self.accountID, params=self.params)
         try:
-            rv = self.api.request(r)
+            rv = self.client.request(r)
             for tick in rv:
                 if self.check_max_duration():
-                    close_all_trades(self.api, self.accountID)
+                    self.bot.close_all_trades()
                     break
                 try:
                     self.process_tick(tick)

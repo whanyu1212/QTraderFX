@@ -40,9 +40,9 @@ def get_account_summary():
     )
 
 
-def fetch_historical_candles(cfg):
+def fetch_historical_candles(cfg, instrument):
     fetcher = FetchHistoricalData(
-        cfg["candlestick"]["instrument"],
+        instrument,
         cfg["candlestick"]["granularity"],
         token,
         cfg["candlestick"]["count"],
@@ -52,10 +52,12 @@ def fetch_historical_candles(cfg):
     return df
 
 
-def start_streaming_pipeline(cfg, df):
+def start_streaming_pipeline(instrument, df, precision, stop_loss, take_profit):
     client = API(access_token=token)
-    params = {"instruments": cfg["pricingstream"]["instrument"]}
-    pipeline = StreamingDataPipeline(accountID, params, client, df)
+    params = {"instruments": instrument}
+    pipeline = StreamingDataPipeline(
+        accountID, params, client, df, precision, stop_loss, take_profit
+    )
     pipeline.run()
 
 
@@ -64,12 +66,33 @@ def main():
     cfg = get_config("./cfg/parameters.yaml")
     # Get account summary before starting the pipeline
     get_account_summary()
-    time.sleep(10)
-    df = calculate_indicators(fetch_historical_candles(cfg))
+    time.sleep(3)
+    print("Select the currency pair to trade:")
+    print("1: EUR/USD")
+    print("2: GBP/USD")
+    print("3: USD/JPY")
+    print("4: AUD/USD")
+    currency_pair = input("Enter the number corresponding to your choice: ")
+
+    if currency_pair == "1":
+        instrument = "EUR_USD"
+    elif currency_pair == "2":
+        instrument = "GBP_USD"
+    elif currency_pair == "3":
+        instrument = "USD_JPY"
+    elif currency_pair == "4":
+        instrument = "AUD_USD"
+    else:
+        print("Invalid selection. Defaulting to EUR/USD.")
+        instrument = "EUR_USD"
+    precision = cfg["instrument_precision"][instrument]
+    stoploss = cfg["stop_loss"][instrument]
+    takeprofit = cfg["take_profit"][instrument]
+    df = calculate_indicators(fetch_historical_candles(cfg, instrument))
     df.dropna(inplace=True)
     logger.success(f"Historical candlestick data fetched successfully:\n{df.tail()}")
     # Where real time streaming data is processed
-    start_streaming_pipeline(cfg, df)
+    start_streaming_pipeline(instrument, df, precision, stoploss, takeprofit)
     logger.info("Pipeline completed.")
 
 

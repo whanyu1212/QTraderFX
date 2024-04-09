@@ -11,15 +11,15 @@ def parse_yml(path):
 def process_streaming_response(response, temp_list):
     bid = float(response["closeoutBid"])
     ask = float(response["closeoutAsk"])
-    mid = round((bid + ask) / 2, 3)
+    mid = (bid + ask) / 2
     temp_list.append(mid)
 
 
 def get_candlestick_data(time, temp_list):
-    open = round(temp_list[0], 3)
-    high = round(max(temp_list), 3)
-    low = round(min(temp_list), 3)
-    close = round(temp_list[-1], 3)
+    open = temp_list[0]
+    high = max(temp_list)
+    low = min(temp_list)
+    close = temp_list[-1]
 
     data = {"Open": open, "High": high, "Low": low, "Close": close}
     df = pd.DataFrame(data, index=[time])
@@ -49,5 +49,13 @@ def calculate_indicators(df):
     )
     df["%K"] = 100 * (df["Close"] - low_5) / (high_5 - low_5)
     df["%D"] = df["%K"].rolling(window=3).mean()
+
+    # support and resistance
+    df["resistance"] = (
+        df["Close"].rolling(window=10).mean() + df["Close"].rolling(window=10).std()
+    )
+    df["support"] = (
+        df["Close"].rolling(window=10).mean() - df["Close"].rolling(window=10).std()
+    )
 
     return df
