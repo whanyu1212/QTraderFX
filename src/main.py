@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import time
 import datetime
+import concurrent.futures
 from loguru import logger
 from termcolor import colored
 from oandapyV20 import API
@@ -61,13 +62,8 @@ def start_streaming_pipeline(instrument, df, precision, stop_loss, take_profit):
     pipeline.run()
 
 
-def main():
-    logger.info("Starting the pipeline...")
-    cfg = get_config("./cfg/parameters.yaml")
-    # Get account summary before starting the pipeline
-    get_account_summary()
-    time.sleep(3)
-    print("Select the currency pair to trade:")
+def select_currency_pair(round_number):
+    print(f"Select the currency pair to trade in round {round_number}:")
     print("1: EUR/USD")
     print("2: GBP/USD")
     print("3: USD/JPY")
@@ -75,25 +71,74 @@ def main():
     currency_pair = input("Enter the number corresponding to your choice: ")
 
     if currency_pair == "1":
-        instrument = "EUR_USD"
+        return "EUR_USD"
     elif currency_pair == "2":
-        instrument = "GBP_USD"
+        return "GBP_USD"
     elif currency_pair == "3":
-        instrument = "USD_JPY"
+        return "USD_JPY"
     elif currency_pair == "4":
-        instrument = "AUD_USD"
+        return "AUD_USD"
     else:
         print("Invalid selection. Defaulting to EUR/USD.")
-        instrument = "EUR_USD"
-    precision = cfg["instrument_precision"][instrument]
-    stoploss = cfg["stop_loss"][instrument]
-    takeprofit = cfg["take_profit"][instrument]
-    df = calculate_indicators(fetch_historical_candles(cfg, instrument))
-    df.dropna(inplace=True)
-    logger.success(f"Historical candlestick data fetched successfully:\n{df.tail()}")
-    # Where real time streaming data is processed
-    start_streaming_pipeline(instrument, df, precision, stoploss, takeprofit)
-    logger.info("Pipeline completed.")
+        return "EUR_USD"
+
+
+def main():
+    logger.info("Starting the pipeline...")
+    cfg = get_config("./cfg/parameters.yaml")
+    # Get account summary before starting the pipeline
+    get_account_summary()
+    time.sleep(3)
+    instrument1 = select_currency_pair(1)
+    instrument2 = select_currency_pair(2)
+
+    while instrument1 == instrument2:
+        print("Duplicate pairs are not allowed. Please select again.")
+        instrument2 = select_currency_pair(2)
+
+    print(f"Selected currency pairs: {instrument1}, {instrument2}")
+
+    precision_1 = cfg["instrument_precision"][instrument1]
+    stoploss_1 = cfg["stop_loss"][instrument1]
+    takeprofit_1 = cfg["take_profit"][instrument1]
+    precision_2 = cfg["instrument_precision"][instrument2]
+    stoploss_2 = cfg["stop_loss"][instrument2]
+    takeprofit_2 = cfg["take_profit"][instrument2]
+    df_1 = calculate_indicators(fetch_historical_candles(cfg, instrument1))
+    df_1.dropna(inplace=True)
+    df_2 = calculate_indicators(fetch_historical_candles(cfg, instrument2))
+    df_2.dropna(inplace=True)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future1 = executor.submit(
+            start_streaming_pipeline,
+            instrument1,
+            df_1,
+            precision_1,
+            stoploss_1,
+            takeprofit_1,
+        )
+        future2 = executor.submit(
+            start_streaming_pipeline,
+            instrument2,
+            df_2,
+            precision_2,
+            stoploss_2,
+            takeprofit_2,
+        )
+
+        try:
+            result1 = future1.result()
+            result2 = future2.result()
+        except Exception as e:
+            print(f"An exception occurred: {e}")
+    # precision = cfg["instrument_precision"][instrument]
+    # stoploss = cfg["stop_loss"][instrument]
+    # takeprofit = cfg["take_profit"][instrument]
+    # df = calculate_indicators(fetch_historical_candles(cfg, instrument))
+    # df.dropna(inplace=True)
+    # logger.success(f"Historical candlestick data fetched successfully:\n{df.tail()}")
+    # start_streaming_pipeline(instrument, df, precision, stoploss, takeprofit)
+    # logger.info("Pipeline completed.")
 
 
 if __name__ == "__main__":

@@ -15,6 +15,11 @@ from src.utils import (
 
 
 class StreamingDataPipeline:
+    ACTION_BUY = 0
+    ACTION_SELL = 1
+    ACTION_HOLD = 2
+    ORDER_SIZE = 100000
+
     def __init__(
         self,
         accountID,
@@ -30,7 +35,7 @@ class StreamingDataPipeline:
         self.client = client
         self.df = df
         self.start_time = datetime.now()
-        self.max_duration = timedelta(minutes=5)
+        self.max_duration = timedelta(minutes=120)
         self.interval_start = datetime.now()
         self.interval = timedelta(minutes=1)
         self.temp_list = []
@@ -55,6 +60,59 @@ class StreamingDataPipeline:
             return True
         return False
 
+    def handle_buy_action(self):
+        print("Action is 0 and no open positions...")
+        print("Placing market order to buy...")
+        self.bot.place_market_order(self.params["instruments"], self.ORDER_SIZE)
+        print()
+
+    def handle_sell_action(self):
+        print("Action is 1 and there are open positions...")
+        print("Placing limit order to sell...")
+        # stoplossprice = self.bot.get_stop_loss_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        # takeprofitprice = self.bot.get_take_profit_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        self.bot.place_limit_order(
+            self.params["instruments"],
+            -self.ORDER_SIZE,
+            self.df["support"].iloc[-1],
+            self.df["resistance"].iloc[-1],
+        )
+        print()
+
+    def handle_take_profit(self):
+        print("Price at resistance level, closing position...")
+        # stoplossprice = self.bot.get_stop_loss_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        # takeprofitprice = self.bot.get_take_profit_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        self.bot.place_limit_order(
+            self.params["instruments"],
+            -self.ORDER_SIZE,
+            self.df["support"].iloc[-1],
+            self.df["resistance"].iloc[-1],
+        )
+
+    def handle_stop_loss(self):
+        print("Price at support level, closing position...")
+        # stoplossprice = self.bot.get_stop_loss_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        # takeprofitprice = self.bot.get_take_profit_price(
+        #     self.params["instruments"], -self.ORDER_SIZE
+        # )
+        self.bot.place_limit_order(
+            self.params["instruments"],
+            -self.ORDER_SIZE,
+            self.df["support"].iloc[-1],
+            self.df["resistance"].iloc[-1],
+        )
+
     def process_tick(self, tick):
         print("Processing tick...")
         process_streaming_response(tick, self.temp_list)
@@ -63,56 +121,38 @@ class StreamingDataPipeline:
         )
         print()
         if datetime.now() - self.interval_start >= self.interval:
-            print("Interval reached...")
+            print("Aggregating data at 1-minute interval...")
             self.interval_start = datetime.now()
             if self.temp_list:
-                print("Temp list is not empty...")
                 new_df = get_candlestick_data(self.interval_start, self.temp_list)
                 action = self.qtrader.update(self.df, new_df)
                 positions = self.bot.get_open_positions()
                 print(f"Open positions: {positions}")
-                if action == 0 and not positions:
-                    print("Action is 0 and no open positions...")
-                    print("Placing market order to buy...")
-                    self.bot.place_market_order(self.params["instruments"], 100000)
-                    print()
+                print()
+                instruments_in_positions = [
+                    position["instrument"] for position in positions
+                ]
 
-                elif action == 1 and positions:
-                    print("Action is 1 and there are open positions...")
-                    print("Placing limit order to sell...")
-                    stoplossprice = self.bot.get_stop_loss_price(
-                        self.params["instruments"], -100000
-                    )
-                    takeprofitprice = self.bot.get_take_profit_price(
-                        self.params["instruments"], -100000
-                    )
-                    self.bot.place_limit_order(
-                        self.params["instruments"],
-                        -100000,
-                        stoplossprice,
-                        takeprofitprice,
-                    )
-                    print()
-                    # close_all_positions(self.client, self.accountID)
+                if (
+                    action == self.ACTION_BUY
+                    and self.params["instruments"] not in instruments_in_positions
+                ):
+                    self.handle_buy_action()
+                elif (
+                    action == self.ACTION_SELL
+                    and self.params["instruments"] in instruments_in_positions
+                ):
+                    self.handle_sell_action()
                 elif (
                     abs(self.temp_list[-1] - self.df["resistance"].iloc[-1]) <= 0.0001
-                    and positions
+                    and self.params["instruments"] in instruments_in_positions
                 ):
-                    print("Price at resistance level, closing position...")
-                    self.bot.place_limit_order(
-                        self.params["instruments"],
-                        -100000,
-                        stoplossprice,
-                        takeprofitprice,
-                    )
-                elif self.temp_list[-1] <= self.df["support"].iloc[-1] and positions:
-                    print("Price at support level, closing position...")
-                    self.bot.place_limit_order(
-                        self.params["instruments"],
-                        -100000,
-                        stoplossprice,
-                        takeprofitprice,
-                    )
+                    self.handle_take_profit()
+                elif (
+                    self.temp_list[-1] <= self.df["support"].iloc[-1]
+                    and self.params["instruments"] in instruments_in_positions
+                ):
+                    self.handle_stop_loss()
                 else:
                     print("Holding position...")
                 self.df = pd.concat([self.df, new_df], ignore_index=True)
@@ -121,7 +161,7 @@ class StreamingDataPipeline:
                 print(self.df.tail(5))
                 print()
         else:
-            print("Interval not reached...")
+            print("Gathering streaming data...")
 
     def run(self):
         self.qtrader.train(self.df)
