@@ -43,7 +43,7 @@ class StreamingDataPipeline:
             num_actions=3,
             num_features=11,
             learning_rate=0.01,
-            discount_factor=0.8,
+            discount_factor=0.9,
             exploration_prob=0.1,
         )
         self.bot = TradingBot(
@@ -75,13 +75,14 @@ class StreamingDataPipeline:
         # takeprofitprice = self.bot.get_take_profit_price(
         #     self.params["instruments"], -self.ORDER_SIZE
         # )
-        self.bot.place_limit_order(
-            self.params["instruments"],
-            -self.ORDER_SIZE,
-            self.df["support"].iloc[-1],
-            self.df["resistance"].iloc[-1],
-        )
-        print()
+        self.bot.place_market_order(self.params["instruments"], -self.ORDER_SIZE)
+        # self.bot.place_limit_order(
+        #     self.params["instruments"],
+        #     -self.ORDER_SIZE,
+        #     self.df["resistance"].iloc[-1],
+        #     self.df["support"].iloc[-1],
+        # )
+        # print()
 
     def handle_take_profit(self):
         print("Price at resistance level, closing position...")
@@ -94,8 +95,8 @@ class StreamingDataPipeline:
         self.bot.place_limit_order_take_profit(
             self.params["instruments"],
             -self.ORDER_SIZE,
-            self.df["support"].iloc[-1],
             self.df["resistance"].iloc[-1],
+            self.df["support"].iloc[-1],
         )
 
     def handle_stop_loss(self):
@@ -109,8 +110,8 @@ class StreamingDataPipeline:
         self.bot.place_limit_order_stop_loss(
             self.params["instruments"],
             -self.ORDER_SIZE,
-            self.df["support"].iloc[-1],
             self.df["resistance"].iloc[-1],
+            self.df["support"].iloc[-1],
         )
 
     def process_tick(self, tick):
@@ -144,13 +145,18 @@ class StreamingDataPipeline:
                 ):
                     self.handle_sell_action()
                 elif (
-                    abs(self.temp_list[-1] - self.df["resistance"].iloc[-1]) <= 0.0001
+                    abs(self.temp_list[-1] - self.df["resistance"].iloc[-1])
+                    <= 1 * 10**-self.precision
                     and self.params["instruments"] in instruments_in_positions
+                    and self.bot.get_buy_in_price(self.params["instruments"])
+                    < self.df["resistance"].iloc[-1]
                 ):
                     self.handle_take_profit()
                 elif (
                     self.temp_list[-1] <= self.df["support"].iloc[-1]
                     and self.params["instruments"] in instruments_in_positions
+                    and self.bot.get_buy_in_price(self.params["instruments"])
+                    > self.df["support"].iloc[-1]
                 ):
                     self.handle_stop_loss()
                 else:
