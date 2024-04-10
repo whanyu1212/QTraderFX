@@ -35,7 +35,7 @@ class StreamingDataPipeline:
         self.client = client
         self.df = df
         self.start_time = datetime.now()
-        self.max_duration = timedelta(minutes=120)
+        self.max_duration = timedelta(minutes=300)
         self.interval_start = datetime.now()
         self.interval = timedelta(minutes=1)
         self.temp_list = []
@@ -91,7 +91,7 @@ class StreamingDataPipeline:
         # takeprofitprice = self.bot.get_take_profit_price(
         #     self.params["instruments"], -self.ORDER_SIZE
         # )
-        self.bot.place_limit_order(
+        self.bot.place_limit_order_take_profit(
             self.params["instruments"],
             -self.ORDER_SIZE,
             self.df["support"].iloc[-1],
@@ -106,7 +106,7 @@ class StreamingDataPipeline:
         # takeprofitprice = self.bot.get_take_profit_price(
         #     self.params["instruments"], -self.ORDER_SIZE
         # )
-        self.bot.place_limit_order(
+        self.bot.place_limit_order_stop_loss(
             self.params["instruments"],
             -self.ORDER_SIZE,
             self.df["support"].iloc[-1],

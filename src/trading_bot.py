@@ -148,6 +148,74 @@ class TradingBot:
             body = "Failed to Take Oanda Trades"
             # send_email_notification(subject, body)
 
+    def place_limit_order_take_profit(
+        self, instrument, units, take_profit_price, stop_loss_price
+    ):
+        body = {
+            "order": {
+                "price": str(round(take_profit_price, self.precision)),
+                "units": str(units),
+                "instrument": instrument,
+                "timeInForce": "GTC",
+                "type": "LIMIT",
+                "positionFill": "DEFAULT",
+                "takeProfitOnFill": {
+                    "price": str(round(take_profit_price, self.precision)),
+                },
+                "stopLossOnFill": {
+                    "price": str(round(stop_loss_price, self.precision)),
+                },
+            }
+        }
+
+        try:
+            request = orders.OrderCreate(self.accountID, data=body)
+            response = self.client.request(request)
+            print("Oanda Orders placed successfully!")
+            subject = "Oanda Trades Initiated"
+            body = "Oanda Trades Initiated"
+            # send_email_notification(subject, body)
+        except V20Error as e:
+            print("Error placing Oanda orders:")
+            print(e)
+            subject = "Failed to Take Oanda Trades"
+            body = "Failed to Take Oanda Trades"
+            # send_email_notification(subject, body)
+
+    def place_limit_order_stop_loss(
+        self, instrument, units, take_profit_price, stop_loss_price
+    ):
+        body = {
+            "order": {
+                "price": str(round(stop_loss_price, self.precision)),
+                "units": str(units),
+                "instrument": instrument,
+                "timeInForce": "GTC",
+                "type": "LIMIT",
+                "positionFill": "DEFAULT",
+                "takeProfitOnFill": {
+                    "price": str(round(take_profit_price, self.precision)),
+                },
+                "stopLossOnFill": {
+                    "price": str(round(stop_loss_price, self.precision)),
+                },
+            }
+        }
+
+        try:
+            request = orders.OrderCreate(self.accountID, data=body)
+            response = self.client.request(request)
+            print("Oanda Orders placed successfully!")
+            subject = "Oanda Trades Initiated"
+            body = "Oanda Trades Initiated"
+            # send_email_notification(subject, body)
+        except V20Error as e:
+            print("Error placing Oanda orders:")
+            print(e)
+            subject = "Failed to Take Oanda Trades"
+            body = "Failed to Take Oanda Trades"
+            # send_email_notification(subject, body)
+
     def close_all_trades(self):
         # Get a list of all open trades for the account
         trades_request = trades.OpenTrades(accountID=self.accountID)
