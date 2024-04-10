@@ -52,10 +52,14 @@ def calculate_indicators(df):
 
     # support and resistance
     df["resistance"] = (
-        df["Close"].rolling(window=10).mean() + 2 * df["Close"].rolling(window=10).std()
+        df["Close"].rolling(window=5).mean()
+        + 0.5 * df["Close"].rolling(window=5).std()  # Adjust multiplier
     )
+
+    # Calculate support level
     df["support"] = (
-        df["Close"].rolling(window=10).mean() - 1 * df["Close"].rolling(window=10).std()
+        df["Close"].rolling(window=5).mean()
+        - 0.5 * df["Close"].rolling(window=5).std()  # Adjust multiplier
     )
 
     return df
