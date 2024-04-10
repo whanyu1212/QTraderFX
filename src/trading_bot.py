@@ -216,6 +216,17 @@ class TradingBot:
             body = "Failed to Take Oanda Trades"
             # send_email_notification(subject, body)
 
+    def get_buy_in_price(self, instrument):
+        r = trades.OpenTrades(accountID=self.accountID)
+        self.client.request(r)
+        trades = r.response
+        for trade in trades["trades"]:
+            if trade["instrument"] == instrument:
+                return round(
+                    float(trade["price"]), self.precision
+                )  # Convert price to float if needed
+        return None
+
     def close_all_trades(self):
         # Get a list of all open trades for the account
         trades_request = trades.OpenTrades(accountID=self.accountID)
