@@ -1,33 +1,67 @@
-## Building a Real Time Trading System in Python
+# QTraderFX
+
+<img src="./pics/qtrader.png" alt="Logo" width="400"/>
+
+<br/>
+<br/>
+
+QTraderFX is an algorithmic trading project that implements a Q-learning based trading strategy. It operates and interacts with the forex market using minute-interval data fetched from OANDA's API. This is a work in progress project. Currently it only supports a subset of currency pairs and limited to long positions only.
+
+<br/>
+
+## High Level Workflow Diagram
+
+```mermaid
+classDiagram
+direction LR
+class StreamingPipeline {
+    +process_tick()
+    +fetch_candlestick_data()
+    +handle_buy_action()
+    +handle_sell_action()
+    +handle_take_profit()
+    +handle_stop_loss()
+    +perform_action()
+}
 
 
-#### To Do List:
-<details>
-<summary>🚧 In Progress</summary>
+class QLearningTrader {
+    +chooseAction()
+    +calculate_reward()
+    +take_action()
+    +train()
+    +update
+}
 
-- [ ] Q Learning Strategy
+class FetchHistoricalData {
+    +fetch_and_process_data()
+}
 
-</details>
+class TradingBot {
+    +get_open_positions()
+    +get_current_price()
+    +get_buy_in_price()
+    +get_take_profit_price()
+    +get_stop_loss_price()
+    +place_market_order()
+    +place_limit_order()
+    +place_limit_order_take_profit()
+    +place_limit_order_stop_loss()
+    +close_all_trades()
+}
 
-<details>
-<summary>📝 To Do</summary>
 
-- [ ] Test Order creation latency
-- [ ] Modularization
-- [ ] Cloud Scheduler
-- [ ] Documentation
 
-</details>
+FetchHistoricalData -->  QLearningTrader: Train and backtest
+QLearningTrader --> StreamingPipeline: Interacts with to derive signals real time
+TradingBot --> StreamingPipeline : Place orders real time
 
-<details>
-<summary>✅ Completed</summary>
+```
 
-- [x] Processing function for streaming data
-- [x] Default gym-anytrading model
-- [x] High level code for ML based strategy with events
-- [x] gym-anytrading with custom indicators
-
-</details>
+## Features
+Utilizes Q-learning algorithm for decision-making in trading.
+Trades on the forex market with minute-interval data.
+Designed for use with OANDA brokerage.
 
 
 #### References:
