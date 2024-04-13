@@ -71,13 +71,16 @@ TradingBot --> StreamingPipeline : Place orders real time
 
 ## How Q-Learning works
 
-\[ Q(s, a) = (1 - \alpha) \cdot Q(s, a) + \alpha \cdot (r + \gamma \cdot \max_{a'} Q(s', a')) \]
+**Q-value Update Formula**:
+- `Q(s, a) = (1 - alpha) * Q(s, a) + alpha * (r + gamma * max_a' Q(s', a'))`
 
-- \( Q(s, a) \) is the Q-value for the specific state-action pair.
-- \( \alpha \) is the learning rate, indicating how significantly new information should adjust the existing Q-value.
-- \( r \) is the reward received after performing action \( a \) in state \( s \).
-- \( \gamma \) is the discount factor, assessing the importance of future rewards.
-- \( \max_{a'} Q(s', a') \) represents the highest predicted Q-value for the next state \( s' \), across all possible actions \( a' \).
+Where:
+- `Q(s, a)` is the Q-value for the specific state-action pair.
+- `alpha` is the learning rate, indicating how significantly new information should adjust the existing Q-value.
+- `r` is the reward received after performing action `a` in state `s`.
+- `gamma` is the discount factor, assessing the importance of future rewards.
+- `max_a' Q(s', a')` represents the highest predicted Q-value for the next state `s'`, across all possible actions `a'`.
+
 
 <br/>
 
