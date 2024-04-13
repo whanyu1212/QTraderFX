@@ -9,6 +9,15 @@ QTraderFX is an algorithmic trading project that implements a Q-learning based t
 
 <br/>
 
+## Rationale
+<u>The reasons for moving away from traditional ML to generate singals are as follow:</u>
+
+- The market is non-stationary. The current goodness of fit of the model does not indicate future trend. **Data/Concept drifts** occur way too often for the signals generated from traditional ML to be meaningful.
+- In higher frequency trading environment. There are way **more noise than actual signals**. The likelihood of **overfitting** on noise is extremely high.
+- Reinforcement learning and other advanced techniques that can adapt to changing environments and consider the sequential nature of decision-making
+
+<br/>
+
 ## High Level Workflow Diagram
 
 ```mermaid
