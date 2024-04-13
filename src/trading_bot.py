@@ -1,13 +1,14 @@
-import oandapyV20
-from oandapyV20 import API
-import oandapyV20.endpoints.positions as positions
-import oandapyV20.endpoints.orders as orders
-import oandapyV20.endpoints.trades as trades
-import oandapyV20.endpoints.pricing as pricing
-from oandapyV20.endpoints.accounts import AccountDetails
-from oandapyV20.exceptions import V20Error
-from dotenv import load_dotenv
 import os
+from typing import Any, Dict, Union
+
+import oandapyV20
+import oandapyV20.endpoints.orders as orders
+import oandapyV20.endpoints.positions as positions
+import oandapyV20.endpoints.pricing as pricing
+import oandapyV20.endpoints.trades as trades
+from dotenv import load_dotenv
+from loguru import logger
+from oandapyV20.exceptions import V20Error
 
 load_dotenv()
 
@@ -30,13 +31,28 @@ class TradingBot:
         self.stop_loss_pips = stop_loss_pips
         self.take_profit_pips = take_profit_pips
 
-    def get_open_positions(self):
+    def get_open_positions(self) -> Dict[str, Any]:
+        """
+        Get open positions for the account.
+
+        Returns:
+            Dict[str, Any]: Open positions for the account
+        """
         request = positions.OpenPositions(accountID=self.accountID)
         response = self.client.request(request)
         open_positions = response["positions"]
         return open_positions
 
-    def get_current_price(self, instrument):
+    def get_current_price(self, instrument: str) -> float:
+        """
+        Get the latest bid price for an instrument.
+
+        Args:
+            instrument (str): currency pair
+
+        Returns:
+            float: price of the instrument
+        """
         params = {"instruments": instrument}
         try:
             request = pricing.PricingInfo(accountID=self.accountID, params=params)
@@ -50,12 +66,47 @@ class TradingBot:
 
         return None
 
-    def get_take_profit_price(self, instrument, units):
+    def get_buy_in_price(self, instrument: str) -> Union[float, None]:
+        """
+        Get the price at which the bot bought the instrument and convert
+        to the required precision.
+
+        Args:
+            instrument (str): currency pair
+
+        Returns:
+            Union[float, None]: price at which the bot bought the
+            instrument or None if not applicable
+        """
+        r = trades.OpenTrades(accountID=self.accountID)
+        self.client.request(r)
+        open_trades = r.response
+        for trade in open_trades["trades"]:
+            if trade["instrument"] == instrument:
+                return round(float(trade["price"]), self.precision)
+        return None
+
+    def get_take_profit_price(self, instrument: str, units: int) -> float:
+        """
+        Get the take profit price for the instrument.
+
+        Args:
+            instrument (str): currency pair
+            units (int): units to trade
+
+        Raises:
+            ValueError: if the instrument is invalid
+            ValueError: if the entry price is not available
+
+        Returns:
+            float: take profit price
+        """
         entry_price = self.get_current_price(instrument)
         if entry_price is None:
             raise ValueError("Could not retrieve the entry price")
 
         params = {"instruments": instrument}
+        # checking pricing availability and if the instrument is currently tradeable
         request = pricing.PricingInfo(accountID=self.accountID, params=params)
         response = self.client.request(request)
         prices = response["prices"][0]
@@ -68,12 +119,27 @@ class TradingBot:
         else:
             raise ValueError(f"Invalid instrument: {instrument}")
 
-    def get_stop_loss_price(self, instrument, units):
+    def get_stop_loss_price(self, instrument: str, units: int) -> float:
+        """
+        Get the stop loss price for the instrument.
+
+        Args:
+            instrument (str): currency pair
+            units (int): units to trade
+
+        Raises:
+            ValueError: if the instrument is invalid
+            ValueError: if the entry price is not available
+
+        Returns:
+            float: stop loss price
+        """
         entry_price = self.get_current_price(instrument)
         if entry_price is None:
             raise ValueError("Could not retrieve the entry price")
 
         params = {"instruments": instrument}
+        # checking pricing availability and if the instrument is currently tradeable
         request = pricing.PricingInfo(accountID=self.accountID, params=params)
         response = self.client.request(request)
         prices = response["prices"][0]
@@ -86,7 +152,14 @@ class TradingBot:
         else:
             raise ValueError(f"Invalid instrument: {instrument}")
 
-    def place_market_order(self, instrument, units):
+    def place_market_order(self, instrument: str, units: int) -> None:
+        """
+        Place a market order for the instrument.
+
+        Args:
+            instrument (str): currency pair
+            units (int): units to trade
+        """
         body = {
             "order": {
                 "units": str(units),
@@ -100,21 +173,34 @@ class TradingBot:
         try:
             request = orders.OrderCreate(self.accountID, data=body)
             response = self.client.request(request)
-            print("Oanda Orders placed successfully!")
-            subject = "Oanda Trades Initiated"
-            body = "Oanda Trades Initiated"
-            # send_email_notification(subject, body)
+            logger.success(f"Oanda Orders placed successfully! Response: {response}")
         except V20Error as e:
-            print("Error placing Oanda orders:")
-            print(e)
-            subject = "Failed to Take Oanda Trades"
-            body = "Failed to Take Oanda Trades"
+            logger.error(f"Error placing Oanda orders:{e}")
 
-    def place_limit_order(self, instrument, units, take_profit_price, stop_loss_price):
+    def place_limit_order(
+        self,
+        instrument: str,
+        units: int,
+        take_profit_price: float,
+        stop_loss_price: float,
+    ) -> None:
+        """
+        Place a conventional limit order when the agent takes a sell
+        action.
+
+        Args:
+            instrument (str): currency pair
+            units (int): units to trade
+            take_profit_price (float): take profit price
+            stop_loss_price (float): stop loss price
+
+        Raises:
+            ValueError: if the price is not available
+        """
         try:
             current_price = self.get_current_price(instrument)
             if current_price is None:
-                raise ValueError("Current price is None")
+                raise ValueError("Price not available")
             body = {
                 "order": {
                     "price": str(round(current_price, self.precision)),
@@ -132,25 +218,32 @@ class TradingBot:
                 }
             }
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"Error getting pricing info:{e}")
 
         try:
             request = orders.OrderCreate(self.accountID, data=body)
             response = self.client.request(request)
-            print("Oanda Orders placed successfully!")
-            subject = "Oanda Trades Initiated"
-            body = "Oanda Trades Initiated"
-            # send_email_notification(subject, body)
+            logger.success(f"Oanda Orders placed successfully! Response: {response}")
         except V20Error as e:
-            print("Error placing Oanda orders:")
-            print(e)
-            subject = "Failed to Take Oanda Trades"
-            body = "Failed to Take Oanda Trades"
-            # send_email_notification(subject, body)
+            logger.error(f"Error placing Oanda orders:{e}")
 
     def place_limit_order_take_profit(
-        self, instrument, units, take_profit_price, stop_loss_price
-    ):
+        self,
+        instrument: str,
+        units: int,
+        take_profit_price: float,
+        stop_loss_price: float,
+    ) -> None:
+        """
+        Place limit order to take profit even when the agent does not
+        take a sell action.
+
+        Args:
+            instrument (str): currency pair
+            units (int): units to trade
+            take_profit_price (float): take profit price
+            stop_loss_price (float): stop loss price
+        """
         body = {
             "order": {
                 "price": str(round(take_profit_price, self.precision)),
@@ -171,19 +264,16 @@ class TradingBot:
         try:
             request = orders.OrderCreate(self.accountID, data=body)
             response = self.client.request(request)
-            print("Oanda Orders placed successfully!")
-            subject = "Oanda Trades Initiated"
-            body = "Oanda Trades Initiated"
-            # send_email_notification(subject, body)
+            logger.success(f"Oanda Orders placed successfully! Response: {response}")
         except V20Error as e:
-            print("Error placing Oanda orders:")
-            print(e)
-            subject = "Failed to Take Oanda Trades"
-            body = "Failed to Take Oanda Trades"
-            # send_email_notification(subject, body)
+            logger.error(f"Error placing Oanda orders:{e}")
 
     def place_limit_order_stop_loss(
-        self, instrument, units, take_profit_price, stop_loss_price
+        self,
+        instrument: str,
+        units: int,
+        take_profit_price: float,
+        stop_loss_price: float,
     ):
         body = {
             "order": {
@@ -205,29 +295,12 @@ class TradingBot:
         try:
             request = orders.OrderCreate(self.accountID, data=body)
             response = self.client.request(request)
-            print("Oanda Orders placed successfully!")
-            subject = "Oanda Trades Initiated"
-            body = "Oanda Trades Initiated"
-            # send_email_notification(subject, body)
+            logger.success(f"Oanda Orders placed successfully! Response: {response}")
         except V20Error as e:
-            print("Error placing Oanda orders:")
-            print(e)
-            subject = "Failed to Take Oanda Trades"
-            body = "Failed to Take Oanda Trades"
-            # send_email_notification(subject, body)
+            logger.error(f"Error placing Oanda orders:{e}")
 
-    def get_buy_in_price(self, instrument):
-        r = trades.OpenTrades(accountID=self.accountID)
-        self.client.request(r)
-        trades = r.response
-        for trade in trades["trades"]:
-            if trade["instrument"] == instrument:
-                return round(
-                    float(trade["price"]), self.precision
-                )  # Convert price to float if needed
-        return None
-
-    def close_all_trades(self):
+    def close_all_trades(self) -> None:
+        """Close all open trades for the account."""
         # Get a list of all open trades for the account
         trades_request = trades.OpenTrades(accountID=self.accountID)
         response = self.client.request(trades_request)
@@ -236,12 +309,11 @@ class TradingBot:
             for trade in response["trades"]:
                 trade_id = trade["id"]
                 try:
-                    # Create a market order to close the trade
-                    data = {
+                    body = {
                         "units": "ALL",
                     }
                     order_request = trades.TradeClose(
-                        accountID=self.accountID, tradeID=trade_id, data=data
+                        accountID=self.accountID, tradeID=trade_id, data=body
                     )
                     response = self.client.request(order_request)
                     print(f"Trade {trade_id} closed successfully.")
