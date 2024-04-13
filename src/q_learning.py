@@ -108,6 +108,8 @@ class QLearningTrader:
         """
         logger.info("Training the Q-learning model...")
 
+        historical_data = historical_data["Action"] = 0
+
         for i in range(len(historical_data) - 1):
             current_close = historical_data.iloc[i]["Close"]
             next_close = historical_data.iloc[i + 1]["Close"]
@@ -115,6 +117,9 @@ class QLearningTrader:
 
             # Choose an action
             action = self.choose_action(self.current_state)
+
+            # Store the action recommended by the Agent in the DataFrame
+            historical_data.loc[i, "Action"] = action
 
             # Calculate the reward
             reward = self.calculate_reward(action, current_close, next_close)
@@ -172,6 +177,8 @@ class QLearningTrader:
 
         # Choose an action based on the current state
         action = self.choose_action(current_state)
+
+        new_data_df["Action"] = action
 
         # Add print statement for the action
         if action == 0:
