@@ -5,16 +5,18 @@
 <br/>
 <br/>
 
-QTraderFX is an algorithmic trading project that implements a Q-learning based trading strategy. It operates and interacts with the forex market using minute-interval data fetched from OANDA's API. This is a work in progress project. Currently it only supports a subset of currency pairs and limited to long positions only.
+QTraderFX is an algorithmic trading project that implements a Q-learning based trading strategy. It operates and interacts with the forex market using minute-interval data fetched from OANDA's API with a time-based exit. This is a work in progress project. Currently it only supports a subset of currency pairs and limited to long positions only.
 
 <br/>
 
 ## Rationale
-<u>The reasons for moving away from traditional ML to generate singals are as follow:</u>
+<u>The reasons for moving away from traditional ML to generate signals are as follow:</u>
 
 - The market is non-stationary. The current goodness of fit of the model does not indicate future trend. **Data/Concept drifts** occur way too often for the signals generated from traditional ML to be meaningful.
 - In higher frequency trading environment. There are way **more noise than actual signals**. The likelihood of **overfitting** on noise is extremely high.
-- Reinforcement learning and other advanced techniques that can adapt to changing environments and consider the sequential nature of decision-making
+- The effectiveness of indicators that provide **explanatory power** for feature extraction can fluctuate and **may not remain consistent over time**.
+- Metrics for traditional ML may not translate to profitable trading strategy.
+- Reinforcement learning and other more sophisticated techniques that can adapt to changing environments and consider the sequential nature of decision-making
 
 <br/>
 
@@ -67,11 +69,47 @@ TradingBot --> StreamingPipeline : Place orders real time
 
 ```
 
-## Features
-Utilizes Q-learning algorithm for decision-making in trading.
-Trades on the forex market with minute-interval data.
-Designed for use with OANDA brokerage.
+## How Q-Learning works
 
+\[ Q(s, a) = (1 - \alpha) \cdot Q(s, a) + \alpha \cdot (r + \gamma \cdot \max_{a'} Q(s', a')) \]
+
+- \( Q(s, a) \) is the Q-value for the specific state-action pair.
+- \( \alpha \) is the learning rate, indicating how significantly new information should adjust the existing Q-value.
+- \( r \) is the reward received after performing action \( a \) in state \( s \).
+- \( \gamma \) is the discount factor, assessing the importance of future rewards.
+- \( \max_{a'} Q(s', a') \) represents the highest predicted Q-value for the next state \( s' \), across all possible actions \( a' \).
+
+<br/>
+
+1. **Initialization of Q-table**: At the start, the Q-table is initialized as a zero matrix. This table has rows representing different possible actions (`Buy`, `Sell`, and `Hold`) and columns representing features of the trading environment. The values in the Q-table represent the agent's estimations of the expected cumulative rewards for taking a specific action in a specific state. The features selected in our case are `OHLC`, `SMA`, `RSI`, `MACD`, `Stochastic Oscillator`, `Support` and `Resistance`.
+
+2. **Action Selection**: The action recommended at each time step is influenced by the exploration-exploitation trade-off. With a certain probability, the agent may decide to explore by generating a random action. Alternatively, it may opt to exploit its existing knowledge by choosing the action associated with the highest Q-value in the current state.
+
+3. **Reward Calculation**: The reward is calculated based on the action taken and the closing price at the next time step. This reward reflects the success of the action according to the market's response.
+
+4. **Q-value Update**: The Q-value for the action taken in the current state is updated using the reward information and the discounted maximum Q-value of the next state. This is done using the formula shown on top
+
+5. **Iteration**: This process is repeated for each time step, continually updating the Q-table and refining the policy until the algorithm converges or a predefined number of episodes are completed.
+
+6. **Cumulative Rewards**: After each action taken by the agent (such as Buy, Sell, or Hold), a reward is assigned based on the outcome. The cumulative reward is the sum of all rewards received from the beginning of an episode to its end. This total reflects the overall effectiveness of the policy being executed by the agent during that episode. Tracking cumulative rewards helps in fine-tuning the parameters of the Q-learning model, such as the learning rate (α) and the discount factor (γ).
+
+**A sample Q-table:**
+
+| Action | Feature 1 | Feature 2 | Feature 3 | Feature 4 | Feature 5 | Feature 6 | Feature 7 | Feature 8 | Feature 9 | Feature 10 | Feature 11 |
+|--------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|------------|------------|
+|   0    |    0.0    |    0.0    |    0.0    |    0.0    |    0.0    | 8.6359e-05|    0.0    | 4.0521e-04| 4.5027e-04|    0.0     |    0.0     |
+|   1    |    0.0    |    0.0    |    0.0    |    0.0    |    0.0    | 5.0669e-05|    0.0    | 1.2232e-04| 2.3010e-04|    0.0     |    0.0     |
+|   2    |    0.0    |    0.0    |    0.0    |    0.0    |    0.0    | 3.2832e-04|    0.0    | 6.2920e-04| 7.2843e-04|    0.0     |    0.0     |
+
+
+
+## Backtesting Result
+
+
+## Forward Testing Result
+
+
+## Limitation and Area for Improvement
 
 #### References:
 https://oanda-api-v20.readthedocs.io  
