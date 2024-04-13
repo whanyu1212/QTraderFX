@@ -1,6 +1,6 @@
 # QTraderFX
 
-<img src="./pics/qtrader.png" alt="Logo" width="400"/>
+<img src="./pics/qtrader.png" alt="Logo" width="300"/>
 
 <br/>
 <br/>
