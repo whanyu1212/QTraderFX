@@ -1,17 +1,20 @@
-import pandas as pd
-import numpy as np
-import time
-import datetime
 import concurrent.futures
-from loguru import logger
-from termcolor import colored
-from oandapyV20 import API
+import datetime
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, Tuple
+
 import oandapyV20.endpoints.accounts as accounts
+import pandas as pd
+from dotenv import load_dotenv
+from loguru import logger
+from oandapyV20 import API
+from termcolor import colored
+
 from src.fetch_historical_data import FetchHistoricalData
 from src.streaming_pipeline import StreamingDataPipeline
-from src.utils import parse_yml, calculate_indicators
-from dotenv import load_dotenv
-import os
+from src.utils import calculate_indicators, parse_yml
 
 load_dotenv()
 
@@ -21,14 +24,11 @@ accountID = os.getenv("OANDA_ACCOUNT_ID")
 token = os.getenv("OANDA_ACCESS_TOKEN")
 
 
-def get_config(path):
-    return parse_yml(path)
-
-
-def get_account_summary():
-    api = API(access_token=token)
+def get_account_summary() -> None:
+    """Print the account summary before starting the pipeline."""
+    client = API(access_token=token)
     r = accounts.AccountSummary(accountID)
-    api.request(r)
+    client.request(r)
     account_info = r.response["account"]
     print(
         colored("Account ID: ", "green")
@@ -41,19 +41,46 @@ def get_account_summary():
     )
 
 
-def fetch_historical_candles(cfg, instrument):
+def fetch_historical_candles(cfg: Dict, instrument: str) -> pd.DataFrame:
+    """
+    Fetch historical candlestick data from the OANDA API and process it
+    into a DataFrame, to be used for training.
+
+    Args:
+        cfg (Dict): configuration dictionary
+        instrument (str): currency pair to fetch data for
+
+    Returns:
+        pd.DataFrame: DataFrame containing the historical data
+    """
     fetcher = FetchHistoricalData(
         instrument,
         cfg["candlestick"]["granularity"],
         token,
         cfg["candlestick"]["count"],
     )
-    df = fetcher.fetch_data()
-    df = fetcher.process_data(df)
+    df = fetcher.fetch_and_process_data()
     return df
 
 
-def start_streaming_pipeline(instrument, df, precision, stop_loss, take_profit):
+def start_streaming_pipeline(
+    instrument: str,
+    df: pd.DataFrame,
+    precision: int,
+    stop_loss: float,
+    take_profit: float,
+):
+    """
+    Execute the real time streaming pipeline for trading the selected
+    currency pair.
+
+    Args:
+        instrument (str): currency pair to trade
+        df (pd.DataFrame): historical candlestick data
+        precision (int): number of decimal places
+        stop_loss (float): stop loss value
+        take_profit (float): take profit value
+    """
     client = API(access_token=token)
     params = {"instruments": instrument}
     pipeline = StreamingDataPipeline(
@@ -62,33 +89,103 @@ def start_streaming_pipeline(instrument, df, precision, stop_loss, take_profit):
     pipeline.run()
 
 
-def select_currency_pair(round_number):
+def select_currency_pair(round_number: int) -> str:
+    """
+    Take user input to select the currency pairs.
+
+    Args:
+        round_number (int): round number
+
+    Returns:
+        str: a string representing the selected currency pair
+    """
     print(f"Select the currency pair to trade in round {round_number}:")
     print("1: EUR/USD")
-    print("2: GBP/USD")
-    print("3: USD/JPY")
-    print("4: AUD/USD")
+    print("2: AUD/USD")
+    print("3: NZD/USD")
+    print("4: GBP/USD")
+    print("5: GBP/JPY")
+    print("6: USD/JPY")
+    print("7: EUR/JPY")
+
     currency_pair = input("Enter the number corresponding to your choice: ")
 
     if currency_pair == "1":
         return "EUR_USD"
     elif currency_pair == "2":
-        return "GBP_USD"
-    elif currency_pair == "3":
-        return "USD_JPY"
-    elif currency_pair == "4":
         return "AUD_USD"
+    elif currency_pair == "3":
+        return "NZD_USD"
+    elif currency_pair == "4":
+        return "GBP_USD"
+    elif currency_pair == "5":
+        return "GBP_JPY"
+    elif currency_pair == "6":
+        return "USD_JPY"
+    elif currency_pair == "7":
+        return "EUR_JPY"
     else:
         print("Invalid selection. Defaulting to EUR/USD.")
         return "EUR_USD"
 
 
+def get_instrument_config(
+    cfg: Dict[str, Dict[str, float]], instrument: str
+) -> Tuple[float, float, float]:
+    precision = cfg["instrument_precision"][instrument]
+    stoploss = cfg["stop_loss"][instrument]
+    takeprofit = cfg["take_profit"][instrument]
+    return precision, stoploss, takeprofit
+
+
+def start_pipeline_in_concurrent_executor(
+    executor: ThreadPoolExecutor,
+    instrument: str,
+    df: pd.DataFrame,
+    precision: int,
+    stoploss: float,
+    takeprofit: float,
+) -> Any:
+    """
+    Start the pipeline in a concurrent executor.
+
+    Args:
+        executor (ThreadPoolExecutor): multithreading executor
+        instrument (str): currency pair to trade
+        df (pd.DataFrame): historical candlestick data
+        precision (int): number of decimal places
+        stoploss (float): stop loss value
+        takeprofit (float): take profit value
+
+    Returns:
+        Any: result of the pipeline execution,
+        not compulsory to return anything
+    """
+    future = executor.submit(
+        start_streaming_pipeline,
+        instrument,
+        df,
+        precision,
+        stoploss,
+        takeprofit,
+    )
+    try:
+        result = future.result()
+    except Exception as e:
+        print(f"An exception occurred: {e}")
+    return result
+
+
 def main():
+    """Main function to run the pipeline from end to end."""
+
     logger.info("Starting the pipeline...")
-    cfg = get_config("./cfg/parameters.yaml")
+    cfg = parse_yml("./cfg/parameters.yaml")
+
     # Get account summary before starting the pipeline
     get_account_summary()
-    time.sleep(3)
+    time.sleep(2)
+
     instrument1 = select_currency_pair(1)
     instrument2 = select_currency_pair(2)
 
@@ -96,49 +193,25 @@ def main():
         print("Duplicate pairs are not allowed. Please select again.")
         instrument2 = select_currency_pair(2)
 
-    print(f"Selected currency pairs: {instrument1}, {instrument2}")
+    print(f"Selected currency pairs are : {instrument1}, {instrument2}")
 
-    precision_1 = cfg["instrument_precision"][instrument1]
-    stoploss_1 = cfg["stop_loss"][instrument1]
-    takeprofit_1 = cfg["take_profit"][instrument1]
-    precision_2 = cfg["instrument_precision"][instrument2]
-    stoploss_2 = cfg["stop_loss"][instrument2]
-    takeprofit_2 = cfg["take_profit"][instrument2]
-    df_1 = calculate_indicators(fetch_historical_candles(cfg, instrument1))
-    df_1.dropna(inplace=True)
-    df_2 = calculate_indicators(fetch_historical_candles(cfg, instrument2))
-    df_2.dropna(inplace=True)
+    precision_1, stoploss_1, takeprofit_1 = get_instrument_config(cfg, instrument1)
+    precision_2, stoploss_2, takeprofit_2 = get_instrument_config(cfg, instrument2)
+
+    df_1 = calculate_indicators(fetch_historical_candles(cfg, instrument1)).dropna(
+        inplace=False
+    )
+    df_2 = calculate_indicators(fetch_historical_candles(cfg, instrument2)).dropna(
+        inplace=False
+    )
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future1 = executor.submit(
-            start_streaming_pipeline,
-            instrument1,
-            df_1,
-            precision_1,
-            stoploss_1,
-            takeprofit_1,
+        start_pipeline_in_concurrent_executor(
+            executor, instrument1, df_1, precision_1, stoploss_1, takeprofit_1
         )
-        future2 = executor.submit(
-            start_streaming_pipeline,
-            instrument2,
-            df_2,
-            precision_2,
-            stoploss_2,
-            takeprofit_2,
+        start_pipeline_in_concurrent_executor(
+            executor, instrument2, df_2, precision_2, stoploss_2, takeprofit_2
         )
-
-        try:
-            result1 = future1.result()
-            result2 = future2.result()
-        except Exception as e:
-            print(f"An exception occurred: {e}")
-    # precision = cfg["instrument_precision"][instrument]
-    # stoploss = cfg["stop_loss"][instrument]
-    # takeprofit = cfg["take_profit"][instrument]
-    # df = calculate_indicators(fetch_historical_candles(cfg, instrument))
-    # df.dropna(inplace=True)
-    # logger.success(f"Historical candlestick data fetched successfully:\n{df.tail()}")
-    # start_streaming_pipeline(instrument, df, precision, stoploss, takeprofit)
-    # logger.info("Pipeline completed.")
+    logger.info("Pipeline completed.")
 
 
 if __name__ == "__main__":
