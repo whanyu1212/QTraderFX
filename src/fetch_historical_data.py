@@ -43,6 +43,16 @@ class FetchHistoricalData:
         return df
 
     def check_columns(self, df: pd.DataFrame) -> None:
+        """
+        Check if the DataFrame contains the expected columns.
+
+        Args:
+            df (pd.DataFrame): input dataframe
+
+        Raises:
+            ValueError: if the DataFrame is missing one
+            or more of the expected columns
+        """
         expected_columns = ["Time", "High", "Close", "Low", "Open"]
         if not set(expected_columns).issubset(df.columns):
             raise ValueError(
@@ -51,6 +61,20 @@ class FetchHistoricalData:
             )
 
     def convert_time(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert the 'Time' column to datetime format and set the
+        timezone to avoid confusion.
+
+        Args:
+            df (pd.DataFrame): input dataframe
+
+        Raises:
+            ValueError: if the 'Time' column cannot be converted
+            ValueError: if the 'Time' column is out of bounds
+
+        Returns:
+            pd.DataFrame: dataframe with the 'Time' column converted
+        """
         try:
             df["Time"] = pd.to_datetime(df["Time"]).dt.tz_convert(self.timezone)
         except pd.errors.OutOfBoundsDatetime:
@@ -62,10 +86,32 @@ class FetchHistoricalData:
         return df
 
     def set_index(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Set the 'Time' column as the index of the DataFrame.
+
+        Args:
+            df (pd.DataFrame): input dataframe
+
+        Returns:
+            pd.DataFrame: dataframe with the 'Time' column as the index
+        """
         df.set_index("Time", inplace=True)
         return df
 
     def convert_to_numeric(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert the 'High', 'Close', 'Low', and 'Open' columns to
+        numeric.
+
+        Args:
+            df (pd.DataFrame): input dataframe
+
+        Raises:
+            ValueError: if the columns cannot be converted to numeric
+
+        Returns:
+            pd.DataFrame: dataframe with the columns converted to numeric
+        """
         expected_columns = ["High", "Close", "Low", "Open"]
         try:
             df[expected_columns] = df[expected_columns].apply(pd.to_numeric)
@@ -73,14 +119,16 @@ class FetchHistoricalData:
             raise ValueError(f"Error converting columns to numeric: {e}")
         return df
 
-    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def fetch_and_process_data(self) -> pd.DataFrame:
+        """
+        Chain the methods together to fetch and process the data.
+
+        Returns:
+            pd.DataFrame: processed dataframe
+        """
+        df = self.fetch_data()
         self.check_columns(df)
         df = self.convert_time(df)
         df = self.set_index(df)
         df = self.convert_to_numeric(df)
-        return df
-
-    def flow(self):
-        df = self.fetch_data()
-        df = self.process_data(df)
         return df
