@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from loguru import logger
 from termcolor import colored
 
@@ -15,7 +15,7 @@ class QLearningTrader:
     ):
 
         self.num_actions = num_actions  # 3: Buy, Sell & Hold
-        self.num_features = num_features  # OLHC
+        self.num_features = num_features  # OLHC + technical indicators
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.exploration_prob = exploration_prob
@@ -27,8 +27,19 @@ class QLearningTrader:
         # Initialize state and action
         self.current_state = None
         self.current_action = None
+        self.latest_q_value = None
 
-    def choose_action(self, state):
+    def choose_action(self, state: np.ndarray) -> int:
+        """
+        Choose an action based on the current state.
+
+        Args:
+            state (np.ndarray): an array representing
+            the current state
+
+        Returns:
+            int: action encoded as an integer
+        """
         # Exploration-exploitation trade-off
         if np.random.uniform(0, 1) < self.exploration_prob:
             return np.random.choice(self.num_actions)  # Explore
@@ -36,20 +47,41 @@ class QLearningTrader:
             feature_index = np.argmax(state)
             return np.argmax(self.q_table[:, feature_index])  # Exploit
 
-    def calculate_reward(self, action, current_close, next_close):
+    def calculate_reward(
+        self, action: int, current_close: float, next_close: float
+    ) -> float:
+        """
+        Assign reward value based on the action taken and the observed
+        price movement in the next time step.
+
+        Args:
+            action (int): action encoded as an integer
+            current_close (float): current closing price
+            next_close (float): closing price in the next time step
+
+        Returns:
+            float: reward value
+        """
         price_change = (next_close - current_close) / current_close
 
         if action == 0:  # Buy
             return price_change  # Profit if price increases, loss if price decreases
         elif action == 1:  # Sell
             return -price_change  # Profit if price decreases, loss if price increases
-        else:
+        else:  # Hold
             if price_change > 0:
-                return price_change
+                return price_change  # Profit if price increases
             else:
-                return -price_change
+                return -price_change  # Loss if price decreases
 
-    def take_action(self, action, reward):
+    def take_action(self, action: int, reward: float) -> None:
+        """
+        Update the Q-table based on the observed reward.
+
+        Args:
+            action (int): action encoded as an integer
+            reward (float): reward value calculated based on the action
+        """
         # Update Q-table based on the observed reward
         if self.current_action is not None:
             feature_index = np.argmax(self.current_state)
@@ -60,20 +92,29 @@ class QLearningTrader:
                 reward + self.discount_factor * np.max(self.q_table[:, feature_index])
             )
             self.q_table[self.current_action, feature_index] = new_q_value
+            self.latest_q_value = new_q_value
 
         # Update current state and action
         self.current_state = None
         self.current_action = action
 
-    def train(self, historical_data):
+    def train(self, historical_data: pd.DataFrame) -> None:
+        """
+        Conduct training and backtesting of the Q-learning model using
+        historical data.
+
+        Args:
+            historical_data (pd.DataFrame): input candlestick data
+        """
         logger.info("Training the Q-learning model...")
 
         for i in range(len(historical_data) - 1):
             current_close = historical_data.iloc[i]["Close"]
             next_close = historical_data.iloc[i + 1]["Close"]
+            self.current_state = historical_data.iloc[i]
 
             # Choose an action
-            action = self.choose_action(current_close)
+            action = self.choose_action(self.current_state)
 
             # Calculate the reward
             reward = self.calculate_reward(action, current_close, next_close)
@@ -95,14 +136,30 @@ class QLearningTrader:
                 + colored(", Reward: ", "green")
                 + colored(f"{reward}", "white")
                 + colored(", Updated Q-value: ", "green")
-                + colored(f"{self.q_table[action, np.argmax(current_close)]}", "white")
+                + colored(f"{self.latest_q_value}", "white")
                 + colored(", Cumulative reward: ", "green")
                 + colored(f"{self.cumulative_reward}", "white")
             )
-
         logger.info("Training complete.")
+        print("Final Q-table:")
+        print(self.q_table)
 
-    def update(self, historical_df, new_data_df):
+    def update(self, historical_df: pd.DataFrame, new_data_df: pd.DataFrame) -> int:
+        """
+        Continuously update the Q-learning model based on real-time data
+        and make trading decisions.
+
+        Args:
+            historical_df (pd.DataFrame): historical candlestick data right
+            before the new data
+            new_data_df (pd.DataFrame): new candlestick data at minute-level
+
+        Raises:
+            ValueError: New data DataFrame must contain exactly one row of data.
+
+        Returns:
+            int: action encoded as an integer
+        """
         self.cumulative_reward = 0
         if len(new_data_df) != 1:
             raise ValueError("New data DataFrame must contain exactly one row of data.")
@@ -145,7 +202,7 @@ class QLearningTrader:
             + colored(", Reward: ", "green")
             + colored(f"{reward}", "white")
             + colored(", Updated Q-value: ", "green")
-            + colored(f"{self.q_table[action, np.argmax(current_state)]}", "white")
+            + colored(f"{self.latest_q_value}", "white")
             + colored(", Cumulative reward: ", "green")
             + colored(f"{self.cumulative_reward}", "white")
         )
