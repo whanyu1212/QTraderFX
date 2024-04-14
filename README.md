@@ -7,6 +7,13 @@
 
 QTraderFX is an algorithmic trading project that implements a Q-learning based trading strategy. It operates and interacts with the forex market using minute-interval data fetched from OANDA's API with a time-based exit. This is a work in progress project. Currently it only supports a subset of currency pairs and limited to long positions only.
 
+
+<br/>
+
+<u>**Screenshot of trading history**</u>
+<br/>
+<img src="./pics/WechatIMG165.jpg" alt="Backtest" width="1000"/>
+
 <br/>
 
 ## Rationale
@@ -120,15 +127,17 @@ In the test phase, to `mimic real-time streaming data`, the agent updates its st
 <br/>
 <img src="./pics/WechatIMG164.jpg" alt="Backtest" width="1000"/>
 <br/>
+<img src="./pics/WechatIMG1454.jpg" alt="Backtest" width="1000"/>
 
 ## Limitation and Area for Improvement
-- Q-Learning typically does not consider capital limitations and assumes the user has unlimited capital to trade which may not be realistic enough to gauge how profitable a strategy is
-- The standard implementation of Q-Learning does not account for position sizing, which is crucial in trading for managing risk and optimizing returns. The user has to manually set stop loss and take profit threshold based on indicators and entry prices
-- The Algorithm does not take into account of transaction cost and slippage cost which negatively affects the profitabiltiy
+- Q-Learning typically does not consider **capital limitations** and assumes the user has unlimited capital to trade which may not be realistic enough to gauge how profitable a strategy is
+- The standard implementation of Q-Learning does not account for **position sizing**, which is crucial in trading for managing risk and optimizing returns. The user has to manually set stop loss and take profit threshold based on indicators and entry prices
+- The Algorithm does not take into account of **transaction cost** and **slippage cost** which negatively affects the profitabiltiy
+- There is a **lack of inherent uptrend** in general, therefore, buying and waiting for currencies to rise can potentially miss out on profitable opportunities that arise from currencies weakening
 - The automation can never fully replace the human in the loop part because of the inability to observe and foresee macroeconomic events such as war, release of CPI news
 
 
-#### References:
+## References:
 https://oanda-api-v20.readthedocs.io  
 https://github.com/AminHP/gym-anytrading/tree/master  
 https://stable-baselines.readthedocs.io/en/master/modules/a2c.html  
