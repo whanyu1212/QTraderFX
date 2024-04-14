@@ -69,10 +69,7 @@ class QLearningTrader:
         elif action == 1:  # Sell
             return -price_change  # Profit if price decreases, loss if price increases
         else:  # Hold
-            if price_change > 0:
-                return price_change  # Profit if price increases
-            else:
-                return -price_change  # Loss if price decreases
+            return price_change
 
     def take_action(self, action: int, reward: float) -> None:
         """
@@ -108,7 +105,8 @@ class QLearningTrader:
         """
         logger.info("Training the Q-learning model...")
 
-        historical_data = historical_data["Action"] = 0
+        actions = []
+        cumulative_rewards = [np.nan]
 
         for i in range(len(historical_data) - 1):
             current_close = historical_data.iloc[i]["Close"]
@@ -117,16 +115,15 @@ class QLearningTrader:
 
             # Choose an action
             action = self.choose_action(self.current_state)
-
+            actions.append(action)
             # Store the action recommended by the Agent in the DataFrame
-            historical_data.loc[i, "Action"] = action
 
             # Calculate the reward
             reward = self.calculate_reward(action, current_close, next_close)
 
             # Update cumulative reward
             self.cumulative_reward += reward
-
+            cumulative_rewards.append(self.cumulative_reward)
             # Take the action and update the Q-table
             self.take_action(action, reward)
 
@@ -149,6 +146,8 @@ class QLearningTrader:
         print("Final Q-table:")
         print(self.q_table)
 
+        return actions, cumulative_rewards
+
     def update(self, historical_df: pd.DataFrame, new_data_df: pd.DataFrame) -> int:
         """
         Continuously update the Q-learning model based on real-time data
@@ -165,6 +164,7 @@ class QLearningTrader:
         Returns:
             int: action encoded as an integer
         """
+
         self.cumulative_reward = 0
         if len(new_data_df) != 1:
             raise ValueError("New data DataFrame must contain exactly one row of data.")
@@ -177,9 +177,6 @@ class QLearningTrader:
 
         # Choose an action based on the current state
         action = self.choose_action(current_state)
-
-        new_data_df["Action"] = action
-
         # Add print statement for the action
         if action == 0:
             print("Buy signal detected.")
@@ -195,7 +192,6 @@ class QLearningTrader:
 
         # Update cumulative reward
         self.cumulative_reward += reward
-
         # Take the action and update the Q-table
         self.take_action(action, reward)
 
