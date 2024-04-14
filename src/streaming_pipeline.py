@@ -184,7 +184,7 @@ class StreamingDataPipeline:
             pd.DataFrame: dataframe containing the
             the data during the streaming process
         """
-        self.qtrader.train(self.df)
+        _, _ = self.qtrader.train(self.df)
         print()
         r = pricing.PricingStream(accountID=self.accountID, params=self.params)
         try:
